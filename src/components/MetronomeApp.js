@@ -147,6 +147,7 @@ const styles = {
     padding: '8px',
     marginBottom: '24px',
     minHeight: '150px',
+    height: '250px', // Fixed height to help with row calculations
   },
   gridContainer: {
     display: 'grid',
@@ -436,9 +437,19 @@ const MetronomeApp = () => {
     const calculateCellSize = () => {
       if (gridContainerRef.current) {
         const containerWidth = gridContainerRef.current.clientWidth;
+        const containerHeight = gridContainerRef.current.parentElement.clientHeight - 16; // Subtract padding
+        
         // Account for gap (8px) between cells
         const availableWidth = containerWidth - ((gridWidth - 1) * 8);
-        const newCellSize = Math.floor(availableWidth / gridWidth);
+        const availableHeight = containerHeight - ((gridHeight - 1) * 8);
+        
+        // Choose the smaller value to ensure cells fit both width and height
+        const widthBasedSize = Math.floor(availableWidth / gridWidth);
+        const heightBasedSize = Math.floor(availableHeight / gridHeight);
+        
+        // Use the smaller of the two to ensure squares fit in both dimensions
+        const newCellSize = Math.min(widthBasedSize, heightBasedSize);
+        
         setCellSize(newCellSize);
       }
     };
@@ -453,7 +464,7 @@ const MetronomeApp = () => {
     return () => {
       window.removeEventListener('resize', calculateCellSize);
     };
-  }, [gridWidth]);
+  }, [gridWidth, gridHeight]);
   
   // Initialize Audio Context on first user interaction
   const initAudioContext = () => {
