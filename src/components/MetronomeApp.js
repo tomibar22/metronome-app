@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 // Import icons from lucide-react
-import { Play, Pause, Plus, Minus, Volume2 } from 'lucide-react';
+import { Play, Pause, Plus, Minus, Volume2, Save, FolderOpen, Trash2 } from 'lucide-react';
 
 // CSS for the metronome
 const styles = {
@@ -151,6 +151,7 @@ const styles = {
   gridContainer: {
     display: 'grid',
     gap: '8px',
+    width: '100%',
   },
   cell: {
     aspectRatio: '1/1',
@@ -217,6 +218,118 @@ const styles = {
     fontSize: '14px',
     color: '#999',
   },
+  presetContainer: {
+    marginBottom: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  presetRow: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'center',
+  },
+  presetButton: {
+    padding: '8px 16px',
+    backgroundColor: '#333',
+    color: 'white',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  presetSaveButton: {
+    backgroundColor: '#166534',
+  },
+  presetLoadButton: {
+    backgroundColor: '#1e40af',
+  },
+  presetDeleteButton: {
+    backgroundColor: '#991b1b',
+  },
+  presetInput: {
+    padding: '8px',
+    backgroundColor: '#333',
+    border: '1px solid #444',
+    borderRadius: '4px',
+    color: 'white',
+    width: '200px',
+  },
+  presetSelect: {
+    padding: '8px',
+    backgroundColor: '#333',
+    border: '1px solid #444',
+    borderRadius: '4px',
+    color: 'white',
+    width: '200px',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: '#222',
+    padding: '20px',
+    borderRadius: '8px',
+    width: '90%',
+    maxWidth: '500px',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: 'white',
+  },
+  modalContent: {
+    marginBottom: '20px',
+  },
+  modalButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px',
+  },
+  modalButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+  },
+  modalConfirm: {
+    backgroundColor: '#166534',
+    color: 'white',
+  },
+  modalCancel: {
+    backgroundColor: '#333',
+    color: 'white',
+  },
+  presetList: {
+    maxHeight: '200px',
+    overflowY: 'auto',
+    marginBottom: '16px',
+    border: '1px solid #444',
+    borderRadius: '4px',
+  },
+  presetItem: {
+    padding: '8px 12px',
+    borderBottom: '1px solid #444',
+    cursor: 'pointer',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  presetItemActive: {
+    backgroundColor: '#1e40af',
+  },
 };
 
 const MetronomeApp = () => {
@@ -227,6 +340,15 @@ const MetronomeApp = () => {
   const [gridWidth, setGridWidth] = useState(4);
   const [gridHeight, setGridHeight] = useState(2);
   const [subdivision, setSubdivision] = useState(1); // 1 = quarter notes, 2 = eighth, 3 = triplets, 4 = sixteenth
+  const [cellSize, setCellSize] = useState(0); // For tracking calculated cell size
+  
+  // Preset states
+  const [presets, setPresets] = useState([]);
+  const [presetName, setPresetName] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // Initialize the grid (all cells as empty)
   const initialGrid = Array(gridWidth * gridHeight).fill('empty');
@@ -249,6 +371,9 @@ const MetronomeApp = () => {
   // Constants for scheduler
   const scheduleAheadTime = 0.1; // How far ahead to schedule audio (seconds)
   const lookahead = 25; // How frequently to call scheduling function (milliseconds)
+  
+  // Reference to the grid container for calculating cell sizes
+  const gridContainerRef = useRef(null);
   
   // Update refs when state changes
   useEffect(() => {
@@ -293,6 +418,42 @@ const MetronomeApp = () => {
       currentBeatRef.current = 0;
     }
   }, [gridWidth, gridHeight, gridCells.length, currentBeat]);
+  
+  // Load presets from localStorage on initial mount
+  useEffect(() => {
+    const savedPresets = localStorage.getItem('metronomePresets');
+    if (savedPresets) {
+      try {
+        setPresets(JSON.parse(savedPresets));
+      } catch (error) {
+        console.error('Error loading presets:', error);
+      }
+    }
+  }, []);
+  
+  // Calculate cell size when grid dimensions change or window resizes
+  useEffect(() => {
+    const calculateCellSize = () => {
+      if (gridContainerRef.current) {
+        const containerWidth = gridContainerRef.current.clientWidth;
+        // Account for gap (8px) between cells
+        const availableWidth = containerWidth - ((gridWidth - 1) * 8);
+        const newCellSize = Math.floor(availableWidth / gridWidth);
+        setCellSize(newCellSize);
+      }
+    };
+    
+    // Calculate immediately
+    calculateCellSize();
+    
+    // Add resize listener
+    window.addEventListener('resize', calculateCellSize);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', calculateCellSize);
+    };
+  }, [gridWidth]);
   
   // Initialize Audio Context on first user interaction
   const initAudioContext = () => {
@@ -489,7 +650,7 @@ const MetronomeApp = () => {
   
   // Add a column
   const addColumn = () => {
-    setGridWidth(prev => Math.min(prev + 1, 12));
+    setGridWidth(prev => Math.min(prev + 1, 16));
   };
   
   // Remove a column
@@ -549,8 +710,264 @@ const MetronomeApp = () => {
     }
   };
   
+  // Save preset to localStorage
+  const savePreset = () => {
+    if (!presetName.trim()) {
+      alert('Please enter a preset name');
+      return;
+    }
+    
+    // Check if the name already exists
+    const existingPresetIndex = presets.findIndex(p => p.name === presetName);
+    
+    const newPreset = {
+      name: presetName,
+      tempo,
+      gridWidth,
+      gridHeight,
+      subdivision,
+      gridCells,
+      date: new Date().toISOString()
+    };
+    
+    let updatedPresets;
+    
+    if (existingPresetIndex >= 0) {
+      // Update existing preset
+      updatedPresets = [...presets];
+      updatedPresets[existingPresetIndex] = newPreset;
+    } else {
+      // Add new preset
+      updatedPresets = [...presets, newPreset];
+    }
+    
+    // Save to state and localStorage
+    setPresets(updatedPresets);
+    localStorage.setItem('metronomePresets', JSON.stringify(updatedPresets));
+    
+    // Clear input and close modal
+    setPresetName('');
+    setShowSaveModal(false);
+  };
+  
+  // Load a preset
+  const loadPreset = (preset) => {
+    if (!preset) return;
+    
+    // Apply preset values
+    setTempo(preset.tempo);
+    setGridWidth(preset.gridWidth);
+    setGridHeight(preset.gridHeight);
+    setSubdivision(preset.subdivision);
+    setGridCells(preset.gridCells);
+    
+    // Close modal if open
+    setShowLoadModal(false);
+    setSelectedPreset(null);
+  };
+  
+  // Delete a preset
+  const deletePreset = () => {
+    if (!selectedPreset) return;
+    
+    const updatedPresets = presets.filter(p => p.name !== selectedPreset.name);
+    
+    // Update state and localStorage
+    setPresets(updatedPresets);
+    localStorage.setItem('metronomePresets', JSON.stringify(updatedPresets));
+    
+    // Close modal
+    setShowDeleteModal(false);
+    setSelectedPreset(null);
+  };
+  
+  // Format date for display
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString();
+  };
+  
+  // Save Modal component
+  const SaveModal = () => (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <div style={styles.modalTitle}>Save Preset</div>
+        <div style={styles.modalContent}>
+          <input
+            type="text"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="Enter preset name"
+            style={styles.presetInput}
+          />
+          {presets.some(p => p.name === presetName) && (
+            <div style={{color: '#f87171', marginTop: '8px', fontSize: '14px'}}>
+              A preset with this name already exists and will be overwritten.
+            </div>
+          )}
+        </div>
+        <div style={styles.modalButtons}>
+          <button 
+            style={{...styles.modalButton, ...styles.modalCancel}} 
+            onClick={() => {
+              setShowSaveModal(false);
+              setPresetName('');
+            }}
+          >
+            Cancel
+          </button>
+          <button 
+            style={{...styles.modalButton, ...styles.modalConfirm}}
+            onClick={savePreset}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+  
+  // Load Modal component
+  const LoadModal = () => (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <div style={styles.modalTitle}>Load Preset</div>
+        <div style={styles.modalContent}>
+          {presets.length === 0 ? (
+            <div style={{color: '#e5e5e5', marginBottom: '12px'}}>
+              No saved presets found.
+            </div>
+          ) : (
+            <div style={styles.presetList}>
+              {presets.map((preset, index) => (
+                <div
+                  key={index}
+                  style={{
+                    ...styles.presetItem,
+                    ...(selectedPreset && selectedPreset.name === preset.name ? styles.presetItemActive : {})
+                  }}
+                  onClick={() => setSelectedPreset(preset)}
+                >
+                  <div>
+                    <div>{preset.name}</div>
+                    <div style={{fontSize: '12px', color: '#999'}}>
+                      {preset.gridWidth}x{preset.gridHeight} grid, {preset.tempo} BPM
+                    </div>
+                    <div style={{fontSize: '10px', color: '#666'}}>
+                      {formatDate(preset.date)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={styles.modalButtons}>
+          <button 
+            style={{...styles.modalButton, ...styles.modalCancel}} 
+            onClick={() => {
+              setShowLoadModal(false);
+              setSelectedPreset(null);
+            }}
+          >
+            Cancel
+          </button>
+          <button 
+            style={{...styles.modalButton, ...styles.modalConfirm}}
+            onClick={() => loadPreset(selectedPreset)}
+            disabled={!selectedPreset}
+          >
+            Load
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+  
+  // Delete Modal component
+  const DeleteModal = () => (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modal}>
+        <div style={styles.modalTitle}>Delete Preset</div>
+        <div style={styles.modalContent}>
+          {presets.length === 0 ? (
+            <div style={{color: '#e5e5e5', marginBottom: '12px'}}>
+              No saved presets found.
+            </div>
+          ) : (
+            <div style={styles.presetList}>
+              {presets.map((preset, index) => (
+                <div
+                  key={index}
+                  style={{
+                    ...styles.presetItem,
+                    ...(selectedPreset && selectedPreset.name === preset.name ? styles.presetItemActive : {})
+                  }}
+                  onClick={() => setSelectedPreset(preset)}
+                >
+                  <div>
+                    <div>{preset.name}</div>
+                    <div style={{fontSize: '12px', color: '#999'}}>
+                      {preset.gridWidth}x{preset.gridHeight} grid, {preset.tempo} BPM
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {selectedPreset && (
+            <div style={{color: '#f87171', marginTop: '8px', fontSize: '14px'}}>
+              Are you sure you want to delete "{selectedPreset.name}"?
+            </div>
+          )}
+        </div>
+        <div style={styles.modalButtons}>
+          <button 
+            style={{...styles.modalButton, ...styles.modalCancel}} 
+            onClick={() => {
+              setShowDeleteModal(false);
+              setSelectedPreset(null);
+            }}
+          >
+            Cancel
+          </button>
+          <button 
+            style={{...styles.modalButton, ...styles.modalConfirm}}
+            onClick={deletePreset}
+            disabled={!selectedPreset}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+  
   return (
     <div style={styles.container}>
+      {/* Preset Controls */}
+      <div style={styles.presetContainer}>
+        <div style={styles.presetRow}>
+          <button 
+            style={{...styles.presetButton, ...styles.presetSaveButton}}
+            onClick={() => setShowSaveModal(true)}
+          >
+            <Save size={16} /> Save Preset
+          </button>
+          <button 
+            style={{...styles.presetButton, ...styles.presetLoadButton}}
+            onClick={() => setShowLoadModal(true)}
+          >
+            <FolderOpen size={16} /> Load Preset
+          </button>
+          <button 
+            style={{...styles.presetButton, ...styles.presetDeleteButton}}
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <Trash2 size={16} /> Delete Preset
+          </button>
+        </div>
+      </div>
+
       {/* Grid Controls */}
       <div style={styles.controlsRow}>
         <div style={styles.controlGroup}>
@@ -620,7 +1037,7 @@ const MetronomeApp = () => {
       {/* Tempo Controls */}
       <div style={styles.tempoControls}>
         <button 
-          onClick={() => setTempo(Math.max(40, tempo - 1))}
+          onClick={() => setTempo(Math.max(0, tempo - 1))}
           style={styles.tempoButton}
         >
           <Minus size={20} />
@@ -629,8 +1046,8 @@ const MetronomeApp = () => {
         <div style={styles.tempoSliderContainer}>
           <input
             type="range"
-            min="40"
-            max="280"
+            min="0"
+            max="500"
             value={tempo}
             onChange={(e) => setTempo(parseInt(e.target.value))}
             style={styles.tempoSlider}
@@ -642,20 +1059,20 @@ const MetronomeApp = () => {
               value={tempo}
               onChange={(e) => {
                 const value = parseInt(e.target.value);
-                if (!isNaN(value) && value >= 40 && value <= 280) {
+                if (!isNaN(value) && value >= 0 && value <= 500) {
                   setTempo(value);
                 }
               }}
               style={styles.tempoInput}
-              min="40"
-              max="280"
+              min="0"
+              max="500"
             />
             <div style={styles.tempoUnit}>BPM</div>
           </div>
         </div>
         
         <button 
-          onClick={() => setTempo(Math.min(280, tempo + 1))}
+          onClick={() => setTempo(Math.min(500, tempo + 1))}
           style={styles.tempoButton}
         >
           <Plus size={20} />
@@ -673,6 +1090,7 @@ const MetronomeApp = () => {
       {/* Beat Grid */}
       <div style={styles.grid}>
         <div 
+          ref={gridContainerRef}
           style={{
             ...styles.gridContainer,
             gridTemplateColumns: `repeat(${gridWidth}, 1fr)`,
@@ -683,7 +1101,11 @@ const MetronomeApp = () => {
             <div 
               key={index}
               onClick={() => toggleCellState(index)}
-              style={getCellStyle(index, cellState)}
+              style={{
+                ...getCellStyle(index, cellState),
+                width: cellSize > 0 ? `${cellSize}px` : 'auto',
+                height: cellSize > 0 ? `${cellSize}px` : 'auto',
+              }}
             >
               {/* Beat number */}
               <div style={styles.cellNumber}>{getCellNumber(index)}</div>
@@ -717,6 +1139,11 @@ const MetronomeApp = () => {
       <div style={styles.instructions}>
         Click a cell to cycle through states: Empty → Normal → Accent → Empty
       </div>
+      
+      {/* Modals */}
+      {showSaveModal && <SaveModal />}
+      {showLoadModal && <LoadModal />}
+      {showDeleteModal && <DeleteModal />}
     </div>
   );
 };
