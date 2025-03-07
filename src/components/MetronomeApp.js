@@ -153,6 +153,7 @@ const styles = {
     display: 'grid',
     gap: '8px',
     width: '100%',
+    height: '100%',
   },
   cell: {
     aspectRatio: '1/1',
@@ -439,15 +440,18 @@ const MetronomeApp = () => {
         const containerWidth = gridContainerRef.current.clientWidth;
         const containerHeight = gridContainerRef.current.parentElement.clientHeight - 16; // Subtract padding
         
-        // Account for gap (8px) between cells
-        const availableWidth = containerWidth - ((gridWidth - 1) * 8);
-        const availableHeight = containerHeight - ((gridHeight - 1) * 8);
+        // Calculate available space including gaps
+        const totalGapsWidth = 8 * (gridWidth - 1);
+        const totalGapsHeight = 8 * (gridHeight - 1);
         
-        // Choose the smaller value to ensure cells fit both width and height
+        const availableWidth = containerWidth - totalGapsWidth;
+        const availableHeight = containerHeight - totalGapsHeight;
+        
+        // Calculate maximum possible size while maintaining the grid layout
         const widthBasedSize = Math.floor(availableWidth / gridWidth);
         const heightBasedSize = Math.floor(availableHeight / gridHeight);
         
-        // Use the smaller of the two to ensure squares fit in both dimensions
+        // Use the smaller dimension to ensure squares
         const newCellSize = Math.min(widthBasedSize, heightBasedSize);
         
         setCellSize(newCellSize);
@@ -1105,6 +1109,7 @@ const MetronomeApp = () => {
           style={{
             ...styles.gridContainer,
             gridTemplateColumns: `repeat(${gridWidth}, 1fr)`,
+            gridTemplateRows: `repeat(${gridHeight}, 1fr)`,
           }}
         >
           {/* Generate the grid cells */}
