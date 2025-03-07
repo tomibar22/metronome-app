@@ -147,13 +147,11 @@ const styles = {
     padding: '8px',
     marginBottom: '24px',
     minHeight: '150px',
-    height: '250px', // Fixed height to help with row calculations
   },
   gridContainer: {
     display: 'grid',
     gap: '8px',
     width: '100%',
-    height: '100%',
   },
   cell: {
     aspectRatio: '1/1',
@@ -438,22 +436,9 @@ const MetronomeApp = () => {
     const calculateCellSize = () => {
       if (gridContainerRef.current) {
         const containerWidth = gridContainerRef.current.clientWidth;
-        const containerHeight = gridContainerRef.current.parentElement.clientHeight - 16; // Subtract padding
-        
-        // Calculate available space including gaps
-        const totalGapsWidth = 8 * (gridWidth - 1);
-        const totalGapsHeight = 8 * (gridHeight - 1);
-        
-        const availableWidth = containerWidth - totalGapsWidth;
-        const availableHeight = containerHeight - totalGapsHeight;
-        
-        // Calculate maximum possible size while maintaining the grid layout
-        const widthBasedSize = Math.floor(availableWidth / gridWidth);
-        const heightBasedSize = Math.floor(availableHeight / gridHeight);
-        
-        // Use the smaller dimension to ensure squares
-        const newCellSize = Math.min(widthBasedSize, heightBasedSize);
-        
+        // Account for gap (8px) between cells
+        const availableWidth = containerWidth - ((gridWidth - 1) * 8);
+        const newCellSize = Math.floor(availableWidth / gridWidth);
         setCellSize(newCellSize);
       }
     };
@@ -468,7 +453,7 @@ const MetronomeApp = () => {
     return () => {
       window.removeEventListener('resize', calculateCellSize);
     };
-  }, [gridWidth, gridHeight]);
+  }, [gridWidth]);
   
   // Initialize Audio Context on first user interaction
   const initAudioContext = () => {
@@ -1109,7 +1094,6 @@ const MetronomeApp = () => {
           style={{
             ...styles.gridContainer,
             gridTemplateColumns: `repeat(${gridWidth}, 1fr)`,
-            gridTemplateRows: `repeat(${gridHeight}, 1fr)`,
           }}
         >
           {/* Generate the grid cells */}
